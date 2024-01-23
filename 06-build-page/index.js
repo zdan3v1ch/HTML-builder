@@ -17,17 +17,18 @@ const readStreamForTemplate = fs.createReadStream(pathToTemplate, {
 });
 
 // create folder project-dist
-function createFolder(pathTo) {
-  fs.mkdir(pathTo, { recursive: true }, (err) => {
-    if (err) {
-      return console.error(err);
-    }
-    // console.log('Directory created successfully!');
+async function createFolder(pathTo) {
+  return new Promise((resolve, reject) => {
+    fs.mkdir(pathTo, { recursive: true }, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
   });
 }
 
-createFolder(pathToProject);
-createFolder(pathToProjectAssets);
 
 //copy style files
 fs.readdir(pathToStyles, { withFileTypes: true }, (err, files) => {
@@ -50,29 +51,31 @@ fs.readdir(pathToStyles, { withFileTypes: true }, (err, files) => {
 });
 
 //copy assets
-function copyAssets(pathFrom, pathTo) {
-  fs.readdir(pathFrom, { withFileTypes: true }, (err, files) => {
-    if (err) {
-      console.log(err);
+async function copyAssets(pathFrom, pathTo) {
+  const files = await fs.promises.readdir(pathFrom, { withFileTypes: true });
+
+  for (const file of files) {
+    if (file.isFile()) {
+      const fileTo = path.join(pathTo, file.name);
+      const fileFrom = path.join(pathFrom, file.name);
+      await fs.promises.copyFile(fileFrom, fileTo);
     } else {
-      files.forEach((file) => {
-        if (file.isFile()) {
-          const fileTo = path.join(pathTo, file.name);
-          const fileFrom = path.join(pathFrom, file.name);
-          fs.copyFile(fileFrom, fileTo, () => {
-            // console.log(`${file.name} is good`);
-          });
-        } else {
-          const newPathTo = path.join(pathTo, file.name);
-          const newPathFrom = path.join(pathFrom, file.name);
-          createFolder(newPathTo);
-          copyAssets(newPathFrom, newPathTo);
-        }
-      });
+      const newPathTo = path.join(pathTo, file.name);
+      const newPathFrom = path.join(pathFrom, file.name);
+      await createFolder(newPathTo);
+      await copyAssets(newPathFrom, newPathTo);
     }
-  });
+  }
 }
-copyAssets(pathToAssets, pathToProjectAssets);
+
+// for async
+async function main() {
+  await createFolder(pathToProject);
+  await createFolder(pathToProjectAssets);
+  await copyAssets(pathToAssets, pathToProjectAssets);
+}
+
+main().catch((error) => console.error(error));
 
 //create index
 function createIndex() {
